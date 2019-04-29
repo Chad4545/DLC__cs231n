@@ -26,22 +26,25 @@ def svm_loss_naive(W, X, y, reg):
   num_classes = W.shape[1]
   num_train = X.shape[0]
   loss = 0.0
-  for i in xrange(num_train):
-    scores = X[i].dot(W)
+  for i in range(num_train):
+    scores = X[i].dot(W) # 1,C
     correct_class_score = scores[y[i]]
-    for j in xrange(num_classes):
+    for j in range(num_classes):
       if j == y[i]:
         continue
       margin = scores[j] - correct_class_score + 1 # note delta = 1
       if margin > 0:
         loss += margin
+        dW[:,j] += X[i,:].T # j번째 score를 만든 weight 업데이트
+        dW[:,y[i]] -= X[i,:].T # 정답 score를 만든 weight 업데이트
 
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
   loss /= num_train
-
+  dW /= num_train
   # Add regularization to the loss.
-  loss += reg * np.sum(W * W)
+  loss += 0.5 * reg * np.sum(W * W)
+  dW += reg*W
 
   #############################################################################
   # TODO:                                                                     #
@@ -70,12 +73,33 @@ def svm_loss_vectorized(W, X, y, reg):
   # Implement a vectorized version of the structured SVM loss, storing the    #
   # result in loss.                                                           #
   #############################################################################
-  pass
+  num_classes = W.shape[1] # C
+  num_train = X.shape[0] # N
+    
+  # X = (N,3072) W=[3072,C]  scores=(N,C)
+  scores = X.dot(W)
+  ###############################################################################
+  # a = np.array([[1, 2, 3, 4],[5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]])#
+  # np.choose([0, 2, 1, 3], a.T)                                                #
+  # >>> [1,7,10,16]                                                             #
+  ###############################################################################
+  correct_class_score = np.choose(y,scores.T).reshape(-1,1)
+  scores = scores - correct_class_score + 1
+  # 결국 max(0,scores) 이므로 0보다 작거나 1(correct_class_score)는 빼주고 계산  
+  scores[scores<0] = 0
+  scores[scores==1] = 0
+  
+  loss = np.sum(scores)/num_train
+  loss += 0.5 * reg * np.sum(W * W)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
-
-
+  # loss에 영향을 준 j 열에 1 들어온다. 여기서 correct class 자리의 값은 0
+  count_matrix = 1*(scores>0)
+  # 위에 각 row 당 1들어온 j 의 갯수 만큼 correct class 자리에 마이너스  
+  count_matrix[range(num_train),y] = -(np.sum(count_matrix, axis=1))  
+  
+ 
   #############################################################################
   # TODO:                                                                     #
   # Implement a vectorized version of the gradient for the structured SVM     #
@@ -85,7 +109,9 @@ def svm_loss_vectorized(W, X, y, reg):
   # to reuse some of the intermediate values that you used to compute the     #
   # loss.                                                                     #
   #############################################################################
-  pass
+  dW = (X.T).dot(count_matrix)
+  dW /= num_train
+  dW += reg*W
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
