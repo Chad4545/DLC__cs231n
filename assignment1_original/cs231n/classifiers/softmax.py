@@ -30,11 +30,42 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  n_sample, n_feature = X.shape
+  n_class = len(np.unique(y))
+  
+  for i in range(n_sample):
+    y_i = y[i]
+    
+    # linear combination: 
+    score_i = X[i].dot(W).reshape(1,-1) # 1,10
+    
+    # make softmax stable for numeric issue
+    exp_score_i = np.exp(score_i - np.max(score_i,keepdims=True))
+    
+    # score to probability
+    prob_i = exp_score_i/np.sum(exp_score_i,keepdims=1)
+                         
+    loss += -np.log(prob_i[0,y_i])  
+                         
+    # gradient of loss w.r.t score_i
+    dscore_i = prob_i.copy() #(1,10)
+    dscore_i[0,y_i] -= 1
+                         
+    dW += X[i].reshape(1,-1).T.dot(dscore_i)
+          # (1,3072).T.dot(1,10)  -> 3072,10
+                        
+  
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
+  loss /= n_sample
+  reg_loss = 0.5*reg*np.sum(W*W)
+  loss += reg_loss
+  
 
+  dW /= n_sample
+  dW += reg*W
+                         
   return loss, dW
 
 
@@ -54,10 +85,30 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  pass
+  n_sample, n_feature = X.shape
+  n_class = len(np.unique(y))
+    
+  score = X.dot(W) # N,C
+  exp_score = np.exp(score-np.max(score,axis=1,keepdims=1))
+  
+  prob = exp_score/np.sum(exp_score,axis=1,keepdims=1) # N,C
+    
+  loss += np.sum(-np.log(prob[np.arange(n_sample),y]))
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
+  loss /= n_sample
+  reg_loss = 0.5*reg*np.sum(W*W)
+  loss += reg_loss
 
+  dscore = prob.copy()
+  
+  # update by each data
+  dscore[np.arange(n_sample),y] -= 1
+  dscore /= n_sample
+  
+  # Gradient of loss w.r.t weights
+  dW = X.T.dot(dscore) # D,C
+  dW += reg*W
   return loss, dW
 
