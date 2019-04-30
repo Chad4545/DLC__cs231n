@@ -75,15 +75,10 @@ def svm_loss_vectorized(W, X, y, reg):
   #############################################################################
   num_classes = W.shape[1] # C
   num_train = X.shape[0] # N
-    
+  
   # X = (N,3072) W=[3072,C]  scores=(N,C)
   scores = X.dot(W)
-  ###############################################################################
-  # a = np.array([[1, 2, 3, 4],[5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16]])#
-  # np.choose([0, 2, 1, 3], a.T)                                                #
-  # >>> [1,7,10,16]                                                             #
-  ###############################################################################
-  correct_class_score = np.choose(y,scores.T).reshape(-1,1)
+  correct_class_score = scores[np.arange(num_train),y].reshape(-1,1)
   scores = scores - correct_class_score + 1
   # 결국 max(0,scores) 이므로 0보다 작거나 1(correct_class_score)는 빼주고 계산  
   scores[scores<0] = 0
@@ -97,7 +92,7 @@ def svm_loss_vectorized(W, X, y, reg):
   # loss에 영향을 준 j 열에 1 들어온다. 여기서 correct class 자리의 값은 0
   count_matrix = 1*(scores>0)
   # 위에 각 row 당 1들어온 j 의 갯수 만큼 correct class 자리에 마이너스  
-  count_matrix[range(num_train),y] = -(np.sum(count_matrix, axis=1))  
+  count_matrix[np.arange(num_train),y] = -(np.sum(count_matrix, axis=1))  
   
  
   #############################################################################

@@ -30,27 +30,29 @@ def softmax_loss_naive(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  n_sample, n_feature = X.shape
-  n_class = len(np.unique(y))
+  n_sample, n_feature = X.shape # N,D
+  n_class = len(np.unique(y))   # C
   
   for i in range(n_sample):
-    y_i = y[i]
+    y_i = y[i]                  # label
     
-    # linear combination: 
+    # linear combination: score
     score_i = X[i].dot(W).reshape(1,-1) # 1,10
     
-    # make softmax stable for numeric issue
+    # make softmax stable for numeric issue(-inf or inf)
     exp_score_i = np.exp(score_i - np.max(score_i,keepdims=True))
     
     # score to probability
     prob_i = exp_score_i/np.sum(exp_score_i,keepdims=1)
-                         
+    
+    # negative log likelihood
     loss += -np.log(prob_i[0,y_i])  
                          
     # gradient of loss w.r.t score_i
     dscore_i = prob_i.copy() #(1,10)
     dscore_i[0,y_i] -= 1
-                         
+    
+    # logal gradient * upstream gradient
     dW += X[i].reshape(1,-1).T.dot(dscore_i)
           # (1,3072).T.dot(1,10)  -> 3072,10
                         
@@ -85,15 +87,13 @@ def softmax_loss_vectorized(W, X, y, reg):
   # here, it is easy to run into numeric instability. Don't forget the        #
   # regularization!                                                           #
   #############################################################################
-  n_sample, n_feature = X.shape
-  n_class = len(np.unique(y))
+  n_sample, n_feature = X.shape # N,D
+  n_class = len(np.unique(y))   # 10
     
   score = X.dot(W) # N,C
-  exp_score = np.exp(score-np.max(score,axis=1,keepdims=1))
-  
+  exp_score = np.exp(score-np.max(score,axis=1,keepdims=1)) # N,C
   prob = exp_score/np.sum(exp_score,axis=1,keepdims=1) # N,C
-    
-  loss += np.sum(-np.log(prob[np.arange(n_sample),y]))
+  loss += np.sum(-np.log(prob[np.arange(n_sample),y])) # scalar
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
@@ -101,9 +101,8 @@ def softmax_loss_vectorized(W, X, y, reg):
   reg_loss = 0.5*reg*np.sum(W*W)
   loss += reg_loss
 
+  #upstream gradient  
   dscore = prob.copy()
-  
-  # update by each data
   dscore[np.arange(n_sample),y] -= 1
   dscore /= n_sample
   
