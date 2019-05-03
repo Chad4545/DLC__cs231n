@@ -13,7 +13,7 @@ class LinearClassifier(object):
 
   def train(self, X, y, learning_rate=1e-3, reg=1e-5, num_iters=100,
             batch_size=200, verbose=False):
-    """
+    '''
     Train this linear classifier using stochastic gradient descent.
 
     Inputs:
@@ -29,7 +29,7 @@ class LinearClassifier(object):
 
     Outputs:
     A list containing the value of the loss function at each training iteration.
-    """
+    '''
     num_train, dim = X.shape
     num_classes = np.max(y) + 1 # assume y takes values 0...K-1 where K is number of classes
     if self.W is None:
