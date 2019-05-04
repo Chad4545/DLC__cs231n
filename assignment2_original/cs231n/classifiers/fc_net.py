@@ -263,6 +263,10 @@ class FullyConnectedNet(object):
             L2_loss += 0.5 * self.reg * np.sum(self.params['W{}'.format(i+1)]**2)
             cache_list.append(cache)
             
+            if self.use_dropout:
+                scores, cache = dropout_forward(scores, self.dropout_param)
+                cache_list.append(cache)
+            
         # last layer(affine)    
         i += 1
         scores, cache = affine_forward(scores, self.params['W{}'.format(i+1)], self.params['b{}'.format(i+1)])
@@ -302,6 +306,8 @@ class FullyConnectedNet(object):
         i -= 1 
         
         while i >= 0:
+            if self.use_dropout:
+                dout = dropout_backward(dout, cache_list.pop())
             
             if self.use_batchnorm:
                 dout, grads['W{}'.format(i+1)], grads['b{}'.format(i+1)],grads['gamma{}'.format(i+1)],grads['beta{}'.format(i+1)] = affine_bn_relu_backward(dout, cache_list.pop())
