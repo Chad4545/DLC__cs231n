@@ -1,3 +1,6 @@
+
+*.so
+
 # Ignore folder named 'datasets'
 datasets/
 

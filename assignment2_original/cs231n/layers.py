@@ -415,11 +415,33 @@ def conv_forward_naive(x, w, b, conv_param):
     - cache: (x, w, b, conv_param)
     """
     out = None
+    N,C,H,W = x.shape # 2 3 4 4
+    F,_,HH,WW = w.shape # 3 3 4 4
+    stride = conv_param.get('stride',1) # None => 1
+    pad = conv_param.get('pad',0)       # None => 0
+    # assert True/False , act  ->(False 인 경우)
+    assert (H + 2 * pad - HH) % stride == 0, 'check the size; filter, stride or height,width'
+    assert (W + 2 * pad - WW) % stride == 0, 'check the size; filter, stride or height,width'
+    H_prime = 1 + (H + 2 * pad - HH) // stride #2
+    W_prime = 1 + (W + 2 * pad - WW) // stride #2
     ###########################################################################
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    pass
+    # np.pad(x,((1,1),(1,1),(1,1),(1,1)),'constant',constant_values=0)
+    # x데이터에 ((데이터앞,데이터뒤),(채널앞,채널뒤),(위,아래),(좌,우)) 해당 숫자만큼 constant_values를 padding
+    # ex) x.shape = (2,2,4,5)
+    #     -> np.pad(x,((0,0),(0,0),(2,2),(3,3)).shape =(2,2,8,11)
+    
+    #N,C,H+2*pad , W+2*pad
+    x_pad = np.pad(x, ((0,0),(0,0),(pad,pad),(pad,pad)), 'constant', constant_values=0)
+    
+    out =np.zeros((N,F,H_prime,W_prime))
+    for n in range(N):
+        for f in range(F):
+            for i in range(H_prime):
+                for j in range(W_prime):              # (F, C, HH, WW)
+                    out[n,f,i,j] = np.sum((x_pad[n,:,i*stride:i*stride+HH,j*stride:j*stride+WW]*w[f,:,:,:])) + b[f]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -441,10 +463,43 @@ def conv_backward_naive(dout, cache):
     - db: Gradient with respect to b
     """
     dx, dw, db = None, None, None
+    x, w, b, conv_param = cache
+    
+    N, C, H, W = x.shape
+    F, _, HH, WW = w.shape
+    stride = conv_param.get('stride', 1)
+    pad = conv_param.get('pad', 0)
+    x_pad = np.pad(x, ((0,0),(0,0),(pad,pad),(pad,pad)), 'constant', constant_values=0)
+    H_prime = 1 + (H + 2 * pad - HH) // stride
+    W_prime = 1 + (W + 2 * pad - WW) // stride
+    
+    '''
+    - x: (N, C, H, W)
+    - w: (F, C, HH, WW)
+    - b: (F,)
+    - x_pad: (N, C, H+2pad, W+2pad)
+    - dout: (N, F, H', W')
+    '''
+    dx_pad = np.zeros_like(x_pad)
+    dx = np.zeros_like(x)
+    dw = np.zeros_like(w)
+    db = np.zeros_like(b)
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
-    pass
+    # 데이터마다 -> featuremap -> H & W
+    for n in range(N):
+        for f in range(F):
+            db[f] += dout[n, f].sum() # featuremap의 모든 픽셀에 b는 1만큼 영향을 줬음 
+            for j in range(0, H_prime):
+                for i in range(0, W_prime): # 잘생각해 보면 featuremap의 한 노드는 receptive field를 영역과 filter와의 dot product
+                                            # 따라서 gradient는 단순히 곱미분 -> broadcast
+                    dout_now = dout[n, f, j, i]
+                    dw[f] += x_pad[n, :, j * stride:j * stride + HH, i * stride:i * stride + WW] * dout_now
+                    dx_pad[n, :, j * stride:j * stride + HH, i * stride:i * stride + WW] += w[f] * dout_now
+                    
+    # padding 한거만큼 빼버리면 dx
+    dx = dx_pad[:, :, pad:pad+H, pad:pad+W]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -467,10 +522,24 @@ def max_pool_forward_naive(x, pool_param):
     - cache: (x, pool_param)
     """
     out = None
+    N, C, H, W = x.shape
+    HH = pool_param.get('pool_height', 2)
+    WW = pool_param.get('pool_width', 2)
+    stride = pool_param.get('stride', 2)
+    assert (H - HH) % stride == 0, 'check the size; filter, stride or height,width'
+    assert (W - WW) % stride == 0, 'check the size; filter, stride or height,width'
+    H_prime = 1 + (H - HH) // stride
+    W_prime = 1 + (W - WW) // stride
+    
+    out = np.zeros((N, C, H_prime, W_prime))
     ###########################################################################
     # TODO: Implement the max pooling forward pass                            #
     ###########################################################################
-    pass
+    for n in range(N):
+        for c in range(C):
+            for i in range(H_prime):
+                for j in range(W_prime):
+                    out[n,c,i,j] = np.max(x[n,c,i*stride:i*stride + HH,j*stride:j*stride + WW])
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -490,10 +559,35 @@ def max_pool_backward_naive(dout, cache):
     - dx: Gradient with respect to x
     """
     dx = None
+    
+    x, pool_param = cache
+    N, C, H, W = x.shape
+    HH = pool_param.get('pool_height', 2)
+    WW = pool_param.get('pool_width', 2)
+    stride = pool_param.get('stride', 2)
+    H_prime = 1 + (H - HH) // stride
+    W_prime = 1 + (W - WW) // stride
+    
+    dx = np.zeros_like(x)
     ###########################################################################
     # TODO: Implement the max pooling backward pass                           #
     ###########################################################################
-    pass
+    # 1 1 1 1 1 #   target = np.ones((5,5) ; target[2,2] +=2                  #
+    # 1 1 1 1 1 #                                                             #
+    # 1 1 3 1 1 #   ind =  np.argmax(target[:3,:3]) == 8                      #
+    # 1 1 1 1 1 #                                                             #
+    # 1 1 1 1 1 #   ind1, ind2 = np.unravel_index(ind,(3,3)) == 2 , 2         #
+    ###########################################################################
+    for n in range(N):
+        for c in range(C):
+            for j in range(H_prime):
+                for i in range(W_prime):
+                    # pooling전의 map에서 pool size안의 가장 큰 값의 index 추출 
+                    ind = np.argmax(x[n, c, j*stride:j*stride+HH, i*stride:i*stride+WW])
+                    # pool size 안에서의 좌표
+                    ind1, ind2 = np.unravel_index(ind, (HH, WW))
+                    # 가장 큰 값으로 dout 전파 
+                    dx[n, c, j*stride:j*stride+HH, i*stride:i*stride+WW][ind1, ind2] = dout[n, c, j, i]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
