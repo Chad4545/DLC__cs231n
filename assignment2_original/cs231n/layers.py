@@ -173,7 +173,20 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # variance, storing your result in the running_mean and running_var   #
         # variables.                                                          #
         #######################################################################
-        pass
+        # batch mean & variance
+        batch_mean = np.mean(x, axis=0)
+        batch_var = np.mean((x-batch_mean)**2, axis=0)
+        #normalize
+        x_hat = (x-batch_mean)/np.sqrt(batch_var +eps)
+        out = (gamma * x_hat) + beta
+        # for test
+        running_mean = momentum * running_mean + (1 - momentum) * batch_mean
+        running_var = momentum * running_var + (1 - momentum) * batch_var
+        
+        # cache : A dict of values needed in the backward pass
+        cache = {'x_minus_mean': (x - batch_mean),
+                'x_hat': x_hat,'gamma': gamma,
+                'sqrtvar': np.sqrt(batch_var + eps)}
         #######################################################################
         #                           END OF YOUR CODE                          #
         #######################################################################
@@ -184,7 +197,12 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # then scale and shift the normalized data using gamma and beta.      #
         # Store the result in the out variable.                               #
         #######################################################################
-        pass
+        #normarlized
+        x_hat = (x - running_mean) / np.sqrt(running_var+eps)
+        # scale and shift
+        out = gamma*x_hat + beta
+        
+       
         #######################################################################
         #                          END OF YOUR CODE                           #
         #######################################################################
@@ -220,10 +238,39 @@ def batchnorm_backward(dout, cache):
     # TODO: Implement the backward pass for batch normalization. Store the    #
     # results in the dx, dgamma, and dbeta variables.                         #
     ###########################################################################
-    pass
-    ###########################################################################
-    #                             END OF YOUR CODE                            #
-    ###########################################################################
+    N,D = dout.shape
+    x_minus_mean = cache.get("x_minus_mean")
+    x_hat = cache.get("x_hat")
+    gamma = cache.get("gamma")
+    sqrtvar = cache.get("sqrtvar")
+    
+    # Goal : dx, dgamma, dbeta
+    # dbeta shape : D,
+    dbeta = dout.sum(axis=0)
+    # dgamma shape : D,
+    dgamma = (dout*x_hat).sum(axis=0)
+    
+    # dx shape: N,D
+    # dx from 1)x_hat 2)batch_var 3)batch_mean
+    
+    # partial x_hat (N,D)
+    dx_hat = dout*gamma
+    
+    # partial batch variance
+    dvar = np.sum(-1 * dx_hat * x_minus_mean / pow(sqrtvar, 3) / 2, axis=0)
+    
+    # partial batch mean
+    # dmean    
+    dmean = np.sum(-1*dx_hat/sqrtvar, axis=0)
+   #dmean += dvar*np.mean(-2*x_minus_mean, axis=0) <- 0
+    
+    # partial x
+    dx = dx_hat/sqrtvar
+    dx += dvar*2*x_minus_mean/N 
+    dx += dmean/N
+    
+    
+    
 
     return dx, dgamma, dbeta
 
@@ -562,3 +609,6 @@ def softmax_loss(x, y):
     dx[np.arange(N), y] -= 1
     dx /= N
     return loss, dx
+
+
+
